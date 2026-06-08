@@ -9,6 +9,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import paho.mqtt.client as mqtt
 from mqtt_init import *
+from mqtt_utils import MQTT_CLIENT_INIT
 
 # Color palette - soft baby room theme
 BG           = '#F0F8FF'
@@ -35,10 +36,6 @@ class Mqtt_client():
         self.clientname = ''
         self.username = ''
         self.password = ''
-        self.on_connected_to_form = ''
-
-    def set_on_connected_to_form(self, f):
-        self.on_connected_to_form = f
 
     def set_broker(self, v):
         self.broker = v
@@ -62,7 +59,7 @@ class Mqtt_client():
         global CONNECTED
         if rc == 0:
             CONNECTED = True
-            self.on_connected_to_form()
+            mainwin.connected.emit()
         else:
             print('Bad connection rc=', rc)
 
@@ -76,7 +73,7 @@ class Mqtt_client():
         mainwin.message_received.emit(topic, m_decode)
 
     def connect_to(self):
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, self.clientname, clean_session=True)
+        self.client = MQTT_CLIENT_INIT(self.clientname)
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_log = self.on_log
@@ -362,11 +359,12 @@ class AlarmLogWidget(QFrame):
 class MainWindow(QMainWindow):
 
     message_received = pyqtSignal(str, str)
+    connected = pyqtSignal()
 
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
         self.mc = Mqtt_client()
-        self.mc.set_on_connected_to_form(self.on_connected)
+        self.connected.connect(self.on_connected)
         self.message_received.connect(self.route_message)
 
         self.setWindowTitle('Smart Baby Room Monitor')

@@ -9,6 +9,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import paho.mqtt.client as mqtt
 from mqtt_init import *
+from mqtt_utils import MQTT_CLIENT_INIT
 
 global clientname, CONNECTED
 CONNECTED = False
@@ -25,10 +26,6 @@ class Mqtt_client():
         self.clientname = ''
         self.username = ''
         self.password = ''
-        self.on_connected_to_form = ''
-
-    def set_on_connected_to_form(self, on_connected_to_form):
-        self.on_connected_to_form = on_connected_to_form
 
     def set_broker(self, value):
         self.broker = value
@@ -53,7 +50,7 @@ class Mqtt_client():
         if rc == 0:
             print('connected OK')
             CONNECTED = True
-            self.on_connected_to_form()
+            mainwin.connected.emit()
         else:
             print('Bad connection Returned code=', rc)
 
@@ -68,7 +65,7 @@ class Mqtt_client():
         print('message from:' + topic, m_decode)
 
     def connect_to(self):
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, self.clientname, clean_session=True)
+        self.client = MQTT_CLIENT_INIT(self.clientname)
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_log = self.on_log
@@ -95,7 +92,6 @@ class ConnectionDock(QDockWidget):
     def __init__(self, mc):
         QDockWidget.__init__(self)
         self.mc = mc
-        self.mc.set_on_connected_to_form(self.on_connected)
 
         self.eConnectbtn = QPushButton('Enable/Connect', self)
         self.eConnectbtn.clicked.connect(self.on_button_connect_click)
@@ -110,37 +106,11 @@ class ConnectionDock(QDockWidget):
         self.Humidity = QLineEdit()
         self.Humidity.setReadOnly(True)
 
-        # test buttons
-        self.btnTempHigh = QPushButton('Temp Too High (27C)')
-        self.btnTempHigh.clicked.connect(lambda: mainwin.set_test_values(27.0, None))
-        self.btnTempHigh.setStyleSheet('background-color: orange;')
-
-        self.btnTempLow = QPushButton('Temp Too Low (13C)')
-        self.btnTempLow.clicked.connect(lambda: mainwin.set_test_values(13.0, None))
-        self.btnTempLow.setStyleSheet('background-color: lightblue;')
-
-        self.btnHumHigh = QPushButton('Humidity Too High (65%)')
-        self.btnHumHigh.clicked.connect(lambda: mainwin.set_test_values(None, 65.0))
-        self.btnHumHigh.setStyleSheet('background-color: lightyellow;')
-
-        self.btnHumLow = QPushButton('Humidity Too Low (25%)')
-        self.btnHumLow.clicked.connect(lambda: mainwin.set_test_values(None, 25.0))
-        self.btnHumLow.setStyleSheet('background-color: lightyellow;')
-
-        self.btnNormal = QPushButton('Reset to Normal (20C, 50%)')
-        self.btnNormal.clicked.connect(lambda: mainwin.set_test_values(20.0, 50.0))
-        self.btnNormal.setStyleSheet('background-color: lightgreen;')
-
         formLayout = QFormLayout()
         formLayout.addRow('Turn On/Off', self.eConnectbtn)
         formLayout.addRow('Pub topic', self.ePublisherTopic)
         formLayout.addRow('Temperature (C)', self.Temperature)
         formLayout.addRow('Humidity (%)', self.Humidity)
-        formLayout.addRow('', self.btnTempHigh)
-        formLayout.addRow('', self.btnTempLow)
-        formLayout.addRow('', self.btnHumHigh)
-        formLayout.addRow('', self.btnHumLow)
-        formLayout.addRow('', self.btnNormal)
 
         widget = QWidget(self)
         widget.setLayout(formLayout)
@@ -163,6 +133,8 @@ class ConnectionDock(QDockWidget):
 
 class MainWindow(QMainWindow):
 
+    connected = pyqtSignal()
+
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
         self.mc = Mqtt_client()
@@ -174,22 +146,17 @@ class MainWindow(QMainWindow):
         self.timer.timeout.connect(self.update_data)
         self.timer.start(update_rate)
 
-        self.setGeometry(30, 600, 340, 320)
+        self.setGeometry(30, 600, 300, 160)
         self.setWindowTitle('DHT Emulator - Baby Room')
 
         self.connectionDock = ConnectionDock(self.mc)
         self.addDockWidget(Qt.TopDockWidgetArea, self.connectionDock)
-
-    def set_test_values(self, temp, hum):
-        if temp is not None:
-            self.temp_current = temp
-        if hum is not None:
-            self.hum_current = hum
+        self.connected.connect(self.connectionDock.on_connected)
 
     def update_data(self):
-        self.temp_current += random.uniform(-0.8, 0.8)
-        self.hum_current += random.uniform(-2.0, 2.0)
-        self.temp_current = round(self.temp_current, 1)
+        self.temp_current += random.uniform(-2.5, 2.5)
+        self.hum_current += random.uniform(-5.0, 5.0)
+        self.temp_current = round(max(10.0, min(35.0, self.temp_current)), 1)
         self.hum_current = round(max(10.0, min(90.0, self.hum_current)), 1)
 
         current_data = 'Temperature: ' + str(self.temp_current) + ' Humidity: ' + str(self.hum_current)

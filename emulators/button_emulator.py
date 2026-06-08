@@ -8,6 +8,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import paho.mqtt.client as mqtt
 from mqtt_init import *
+from mqtt_utils import MQTT_CLIENT_INIT
 
 global clientname, CONNECTED, armed
 CONNECTED = False
@@ -24,11 +25,6 @@ class Mqtt_client():
         self.clientname = ''
         self.username = ''
         self.password = ''
-        self.on_connected_to_form = ''
-
-    def set_on_connected_to_form(self, on_connected_to_form):
-        self.on_connected_to_form = on_connected_to_form
-
     def set_broker(self, value):
         self.broker = value
 
@@ -52,7 +48,7 @@ class Mqtt_client():
         if rc == 0:
             print('connected OK')
             CONNECTED = True
-            self.on_connected_to_form()
+            mainwin.connected.emit()
         else:
             print('Bad connection Returned code=', rc)
 
@@ -67,7 +63,7 @@ class Mqtt_client():
         print('message from:' + topic, m_decode)
 
     def connect_to(self):
-        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, self.clientname, clean_session=True)
+        self.client = MQTT_CLIENT_INIT(self.clientname)
         self.client.on_connect = self.on_connect
         self.client.on_disconnect = self.on_disconnect
         self.client.on_log = self.on_log
@@ -94,7 +90,6 @@ class ConnectionDock(QDockWidget):
     def __init__(self, mc):
         QDockWidget.__init__(self)
         self.mc = mc
-        self.mc.set_on_connected_to_form(self.on_connected)
 
         self.eConnectbtn = QPushButton('Enable/Connect', self)
         self.eConnectbtn.clicked.connect(self.on_button_connect_click)
@@ -161,6 +156,8 @@ class ConnectionDock(QDockWidget):
 
 class MainWindow(QMainWindow):
 
+    connected = pyqtSignal()
+
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
         self.mc = Mqtt_client()
@@ -170,6 +167,7 @@ class MainWindow(QMainWindow):
 
         self.connectionDock = ConnectionDock(self.mc)
         self.addDockWidget(Qt.TopDockWidgetArea, self.connectionDock)
+        self.connected.connect(self.connectionDock.on_connected)
 
 
 app = QApplication(sys.argv)

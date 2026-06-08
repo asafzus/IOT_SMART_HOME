@@ -8,6 +8,7 @@ import time
 import random
 from datetime import datetime
 from mqtt_init import *
+from mqtt_utils import MQTT_CLIENT_INIT
 from db import create_table, insert_reading
 
 armed = False
@@ -118,7 +119,7 @@ def send_msg(client, topic, message):
 def client_init():
     r = random.randrange(1, 10000000)
     cname = 'baby_manager_' + str(r)
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1, cname, clean_session=True)
+    client = MQTT_CLIENT_INIT(cname)
     client.on_connect = on_connect
     client.on_disconnect = on_disconnect
     client.on_log = on_log
